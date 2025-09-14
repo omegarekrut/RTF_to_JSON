@@ -23,7 +23,7 @@ class TestRTFConverter:
         assert "Hello World" in result
 
     def test_convert_nonexistent_file(self):
-        """Test handling of nonexistent file."""
+        """Test handling of a nonexistent file."""
         fake_path = Path("/nonexistent/file.rtf")
         with pytest.raises(FileNotFoundError):
             self.converter.convert_file(fake_path)

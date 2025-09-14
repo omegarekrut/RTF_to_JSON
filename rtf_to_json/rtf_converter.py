@@ -1,7 +1,6 @@
 """RTF to text conversion module using striprtf."""
 
 from pathlib import Path
-from typing import Optional
 from striprtf.striprtf import rtf_to_text
 
 
