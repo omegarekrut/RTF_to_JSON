@@ -1,6 +1,6 @@
 """Pydantic data models for Rogue Trader entities."""
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 
 
