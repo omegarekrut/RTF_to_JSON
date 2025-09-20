@@ -1,0 +1,32 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+.env
+.env.*
+venv/
+
+# Tooling
+.idea/
+.vscode/
+.mypy_cache/
+.pyre/
+ruff_cache/
+
+# Build artefacts
+build/
+dist/
+*.egg-info/
+
+# Test & coverage output
+.pytest_cache/
+.coverage*
+coverage.xml
+htmlcov/
