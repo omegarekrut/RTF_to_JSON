@@ -1,7 +1,11 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "rtf-to-json"
 version = "0.1.0"
-description = "Add your description here"
+description = "Convert RTF files to structured JSON for Rogue Trader campaigns"
 requires-python = ">=3.13"
 dependencies = [
     "striprtf>=0.0.29",
@@ -12,3 +16,7 @@ dependencies = [
 
 [project.scripts]
 rtf-to-json = "rtf_to_json.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["rtf_to_json*"]
+exclude = ["tests*", "rtf*", "json*"]
