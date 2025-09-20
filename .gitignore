@@ -30,3 +30,7 @@ dist/
 .coverage*
 coverage.xml
 htmlcov/
+
+# Input/Output
+json
+rtf
