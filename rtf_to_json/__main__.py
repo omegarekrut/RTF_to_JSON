@@ -5,42 +5,53 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+import json
 from .rtf_converter import RTFConverter
-from .models import CampaignData, System
+from .parser import CampaignParser
+from .models import CampaignData
+from .validation import validate_campaign_data
 
 
-def create_basic_system_from_text(text: str) -> System:
-    """Create a basic system from converted text (rudimentary parsing for Phase 1)."""
-    lines = [line.strip() for line in text.split('\n') if line.strip()]
+def _generate_output_path(input_path: Path) -> Path:
+    """Generate output path from input RTF path."""
+    json_dir = Path("json")
+    json_dir.mkdir(exist_ok=True)
 
-    system_name = lines[0] if lines else "Unnamed System"
-
-    return System(
-        id="system_001",
-        name=system_name,
-        features=[],
-        zones=[]
-    )
+    output_filename = input_path.stem + ".json"
+    return json_dir / output_filename
 
 
-def convert_rtf_to_json(rtf_path: Path, output_path: Optional[Path] = None) -> str:
+def convert_rtf_to_json(rtf_path: Path, output_path: Optional[Path] = None) -> Path:
     """Convert RTF file to JSON format."""
     converter = RTFConverter()
+    parser = CampaignParser()
 
-    text = converter.convert_file(rtf_path)
+    structured_text = converter.convert_file(rtf_path)
+    campaign_data = parser.parse(structured_text)
 
-    system = create_basic_system_from_text(text)
+    # Wrap in a campaign_data object as per plan specification
+    output_data = {"campaign_data": campaign_data.model_dump()}
 
-    campaign = CampaignData(systems=[system])
+    # Validate against schema
+    validation_errors = validate_campaign_data(output_data)
+    if validation_errors:
+        print("Warning: Validation errors found:")
+        for error in validation_errors:
+            print(f"  - {error}")
 
-    json_data = campaign.model_dump_json(indent=2)
+    json_data = json.dumps(output_data, indent=2)
 
-    if output_path:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(json_data)
-        print(f"JSON output written to: {output_path}")
+    # Auto-generate output path if not provided
+    if not output_path:
+        output_path = _generate_output_path(rtf_path)
 
-    return json_data
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(json_data)
+
+    print(f"JSON output written to: {output_path}")
+    return output_path
 
 
 def main() -> None:
@@ -59,16 +70,13 @@ def main() -> None:
         "--output",
         "-o",
         type=Path,
-        help="Output path for JSON file (default: print to stdout)"
+        help="Output path for JSON file (default: auto-generate json/<filename>.json)"
     )
 
     args = parser.parse_args()
 
     try:
-        json_output = convert_rtf_to_json(args.rtf_file, args.output)
-
-        if not args.output:
-            print(json_output)
+        output_path = convert_rtf_to_json(args.rtf_file, args.output)
 
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
