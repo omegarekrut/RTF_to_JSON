@@ -77,6 +77,8 @@ class CampaignParser:
             # Direct assignments
             'type': lambda v: setattr(self.current_planet, 'type', v),
             'inhabitants': lambda v: setattr(self.current_planet, 'inhabitants', v),
+            'inhabitant development': lambda v: setattr(self.current_planet, 'inhabitant_development', v),
+            'warp storm': lambda v: setattr(self.current_planet, 'warp_storm', v),
 
             # Physical properties
             'body': self._set_physical_body,

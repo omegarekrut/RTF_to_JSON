@@ -18,6 +18,7 @@ class RTFConverter:
             # Headers by font size (most specific first)
             (r'\\fs39\\f2\\b\\ul\s*\{\\ltrch ([^}]+)\}', r'<<H1>>\1<</H1>>'),
             (r'\\fs30\\f2\\b\\ul\s*\{\\ltrch ([^}]+)\}', r'<<H2>>\1<</H2>>'),
+            (r'\\fs24\\f2\\b\s*\{\\ltrch ([^}]+)\}', r'<<H3>>\1<</H3>>'),
             (r'\\fs21\\f2\\b\s*\{\\ltrch ([^}]+)\}', r'<<H3>>\1<</H3>>'),
 
             # Table-style bold labels with inline values (stat tables)
@@ -65,7 +66,8 @@ class RTFConverter:
         try:
             structured_text = self._preserve_structure(rtf_content)
             plain_text = rtf_to_text(structured_text)
-            return self._clean_text(plain_text)
+            cleaned_text = self._clean_text(plain_text)
+            return self._promote_planet_headers(cleaned_text)
         except Exception as e:
             raise RuntimeError(f"Failed to convert RTF content: {e}") from e
 
@@ -115,3 +117,54 @@ class RTFConverter:
                 prev_empty = True
 
         return '\n'.join(normalized_lines)
+
+    def _promote_planet_headers(self, text: str) -> str:
+        """Promote ENTITY tags to H3 headers when followed by Type: labels."""
+        if not text.strip():
+            return text
+
+        lines = text.split('\n')
+        result_lines = []
+
+        for i, line in enumerate(lines):
+            if not self._contains_entity_tag(line):
+                result_lines.append(line)
+                continue
+
+            if not self._has_type_label_ahead(lines, i):
+                result_lines.append(line)
+                continue
+
+            converted_line = self._convert_entity_to_h3(line)
+            result_lines.append(converted_line)
+
+        return '\n'.join(result_lines)
+
+    def _contains_entity_tag(self, line: str) -> bool:
+        """Check if line contains both opening and closing ENTITY tags."""
+        return '<<ENTITY>>' in line and '</ENTITY>>' in line
+
+    def _has_type_label_ahead(self, lines: list[str], current_index: int) -> bool:
+        """Check if a Type: label appears in the next few lines."""
+        LOOKAHEAD_LINES = 3
+        TYPE_LABELS = ['<<LABEL>>Type:', '<<LABEL>>type:']
+        STRUCTURAL_TAGS = ['<<H1>>', '<<H2>>', '<<H3>>', '<<ENTITY>>']
+
+        end_index = min(current_index + 1 + LOOKAHEAD_LINES, len(lines))
+
+        for j in range(current_index + 1, end_index):
+            next_line = lines[j].strip()
+
+            # Found a type label - early return
+            if any(label in next_line for label in TYPE_LABELS):
+                return True
+
+            # Stop looking if we hit another structural element - early return
+            if any(tag in next_line for tag in STRUCTURAL_TAGS):
+                return False
+
+        return False
+
+    def _convert_entity_to_h3(self, line: str) -> str:
+        """Convert ENTITY tags to H3 tags."""
+        return line.replace('<<ENTITY>>', '<<H3>>').replace('</ENTITY>>', '</H3>>')

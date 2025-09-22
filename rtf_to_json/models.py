@@ -50,6 +50,8 @@ class CelestialBody(BaseModel):
     geography: Optional[Geography] = None
     resources: Optional[Resources] = None
     inhabitants: str = "None"
+    inhabitant_development: str = "None"
+    warp_storm: str = "None"
     satellites: List['CelestialBody'] = Field(default_factory=list)
 
 
