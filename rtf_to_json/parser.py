@@ -4,7 +4,7 @@ import re
 from enum import Enum
 from typing import List, Optional, Any
 from .models import (
-    System, Zone, CelestialBody, Ship, PirateDen, Character,
+    System, Zone, ZoneHazard, CelestialBody, Ship, PirateDen, Character,
     PhysicalProperties, Geography, Resources, MineralResources, ResourceLevel,
     CharacterStats, CombatInfo, CharacterAbilities, CampaignData
 )
@@ -18,6 +18,7 @@ class ParserState(Enum):
     PIRATE_DEN = "pirate_den"
     SHIP_DETAILS = "ship_details"
     ZONE_HEADER = "zone_header"
+    ZONE_HAZARD = "zone_hazard"
     PLANET_DETAILS = "planet_details"
     MOON_DETAILS = "moon_details"
     CHARACTER_STATS = "character_stats"
@@ -44,6 +45,7 @@ class CampaignParser:
         """Reset all current entity references."""
         self.current_system: Optional[System] = None
         self.current_zone: Optional[Zone] = None
+        self.current_hazard: Optional[ZoneHazard] = None
         self.current_planet: Optional[CelestialBody] = None
         self.current_pirate_den: Optional[PirateDen] = None
         self.current_ship: Optional[Ship] = None
@@ -66,6 +68,7 @@ class CampaignParser:
         self.state_processors = {
             ParserState.SYSTEM_HEADER: self._process_system_field,
             ParserState.ZONE_HEADER: self._process_zone_field,
+            ParserState.ZONE_HAZARD: self._process_zone_hazard_field,
             ParserState.SHIP_DETAILS: self._process_ship_field,
             ParserState.PIRATE_DEN: self._process_pirate_den_field,
             ParserState.PLANET_DETAILS: self._process_planet_field,
@@ -227,13 +230,23 @@ class CampaignParser:
         self.state = ParserState.PLANET_DETAILS
 
     def _handle_entity_name(self, line: str) -> None:
-        """Handle entity names (ships, characters)."""
+        """Handle entity names (ships, characters, zone hazards)."""
         entity_name = self._extract_text(line, 'ENTITY')
 
         if self.state in (ParserState.PIRATE_DEN, ParserState.SHIP_DETAILS):
             self._finalize_ship()
             self.current_ship = Ship(name=entity_name, ship_type=entity_name, ship_class="Unknown")
             self.state = ParserState.SHIP_DETAILS
+            return
+
+        if (self.state in (ParserState.ZONE_HEADER, ParserState.PLANET_DETAILS) and
+            self._is_zone_hazard(entity_name)):
+            # Finalize any current planet if we're transitioning from planet details
+            if self.state == ParserState.PLANET_DETAILS:
+                self._finalize_planet_entities()
+            self._finalize_hazard()
+            self.current_hazard = ZoneHazard(name=entity_name, description="")
+            self.state = ParserState.ZONE_HAZARD
             return
 
         if self._should_treat_as_character(entity_name):
@@ -270,6 +283,16 @@ class CampaignParser:
             self._process_character_stat_values(line)
             return
 
+        # Handle zone hazard descriptions
+        if self.state == ParserState.ZONE_HAZARD and self.current_hazard:
+            value = self._extract_text(line, 'VALUE')
+            if value.strip():
+                self.current_hazard.description = value
+                self._finalize_hazard()
+                # Return to zone header state to be ready for more hazards or zone transitions
+                self.state = ParserState.ZONE_HEADER
+            return
+
         if not self.pending_label:
             return
 
@@ -304,6 +327,12 @@ class CampaignParser:
         match label:
             case "system influence":
                 self.current_zone.influence = value
+
+    def _process_zone_hazard_field(self, label: str, value: str) -> None:
+        """Process zone hazard-specific fields."""
+        # Zone hazards typically don't have additional labeled fields
+        # The description comes from the VALUE tag following the ENTITY
+        pass
 
     def _process_ship_field(self, label: str, value: str) -> None:
         """Process ship-specific fields."""
@@ -455,6 +484,20 @@ class CampaignParser:
             if keyword in resource_type.lower():
                 setattr(self.current_planet.resources.mineral, field_name, resource_level)
                 return
+
+    def _is_zone_hazard(self, entity_name: str) -> bool:
+        """Determine if an entity should be treated as a zone hazard."""
+        name_lower = entity_name.lower()
+
+        # Known zone hazards from the Rogue Trader universe (using singular forms to match both singular and plural)
+        hazard_types = {
+            "dust cloud", "asteroid belt", "asteroid cluster", "gravity riptide",
+            "gravity tide", "solar flare", "radiation burst", "warp storm",
+            "debris field", "asteroid field", "nebula", "ion storm", "plasma storm",
+            "magnetic anomaly", "temporal distortion", "void kraken", "derelict station"
+        }
+
+        return any(hazard in name_lower for hazard in hazard_types)
 
     def _should_treat_as_character(self, entity_name: str) -> bool:
         """Determine if an entity should be treated as a character."""
@@ -611,6 +654,12 @@ class CampaignParser:
             self.characters.append(self.current_character)
             self.current_character = None
 
+    def _finalize_hazard(self) -> None:
+        """Finalize current zone hazard."""
+        if self.current_hazard and self.current_zone:
+            self.current_zone.hazards.append(self.current_hazard)
+            self.current_hazard = None
+
     def _finalize_ship(self) -> None:
         """Finalize current ship."""
         if self.current_ship and self.current_pirate_den:
@@ -631,6 +680,7 @@ class CampaignParser:
     def _finalize_zone_entities(self) -> None:
         """Finalize zone-level entities."""
         self._finalize_planet_entities()
+        self._finalize_hazard()
         self._finalize_ship()  # Finalize ship before nulling pirate den
 
         if self.current_zone and self.current_system:

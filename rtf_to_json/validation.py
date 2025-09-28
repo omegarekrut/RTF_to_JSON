@@ -104,6 +104,15 @@ class CampaignValidator:
             "required": ["id", "name", "type"]
         }
 
+        self.zone_hazard_schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "description": {"type": "string"}
+            },
+            "required": ["name", "description"]
+        }
+
         self.zone_schema = {
             "type": "object",
             "properties": {
@@ -112,6 +121,10 @@ class CampaignValidator:
                 "celestial_bodies": {
                     "type": "array",
                     "items": self.celestial_body_schema
+                },
+                "hazards": {
+                    "type": "array",
+                    "items": self.zone_hazard_schema
                 }
             },
             "required": ["name"]

@@ -55,11 +55,18 @@ class CelestialBody(BaseModel):
     satellites: List['CelestialBody'] = Field(default_factory=list)
 
 
+class ZoneHazard(BaseModel):
+    """Represents a hazard or anomaly within a zone."""
+    name: str
+    description: str
+
+
 class Zone(BaseModel):
     """Represents an orbital zone within a system."""
     name: str
     influence: str = "Normal"
     celestial_bodies: List[CelestialBody] = Field(default_factory=list)
+    hazards: List[ZoneHazard] = Field(default_factory=list)
 
 
 class Ship(BaseModel):
